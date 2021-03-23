@@ -19,8 +19,9 @@ case class Board(rows: Seq[Cluster]) {
   // Convenience for merging payloads
   implicit val scanPayloadMonoid: Monoid[ExpandPayload] = new Monoid[ExpandPayload] {
     def empty: ExpandPayload = ExpandPayload(Set.empty, Set.empty)
+
     def combine(x: ExpandPayload, y: ExpandPayload): ExpandPayload =
-      ExpandPayload(x.cluster ++ y.cluster, x.scanned ++ y.scanned )
+      ExpandPayload(x.cluster ++ y.cluster, x.scanned ++ y.scanned)
   }
 
   /**
@@ -53,18 +54,19 @@ case class Board(rows: Seq[Cluster]) {
    * Recursive algorithm to find all clusters of asterisks on the board
    *
    * @param coordsToScan coordinates left to scan
-   * @param payload recursive payload
+   * @param payload      recursive payload
    * @return new payload for next iteration
    */
   @tailrec
-  private def scanForClusters(coordsToScan: Cluster, payload: ScanPayload): ScanPayload = {
+  private def scanForClusters(coordsToScan: Seq[Coord], payload: ScanPayload): ScanPayload = {
 
     coordsToScan match {
       case Nil => payload
       case next :: tail =>
         val expanded = expandCluster(Set(next), ExpandPayload(Set.empty[Coord], payload.scanned))
         val newPayload = ScanPayload(payload.clusters + expanded.cluster, payload.scanned ++ expanded.scanned)
-        scanForClusters(tail, newPayload)
+        // Filter out scanned coordinates from expansion and continue searching for more clusters
+        scanForClusters(tail.diff(newPayload.scanned.toSeq), newPayload)
     }
   }
 
@@ -84,16 +86,17 @@ case class Board(rows: Seq[Cluster]) {
       case c if c.isEmpty => payload
       case head :: tail =>
         val newPayload = ExpandPayload(payload.cluster + head, payload.scanned + head)
-        val surrounding = Set(coordNeighbors(head): _*)
+        val surrounding = Set(coordNeighbors(head) ++ tail: _*)
           .filter(_.on)
           .diff(newPayload.cluster)
           .diff(newPayload.scanned)
-        expandCluster( surrounding ++ tail, newPayload )
+        expandCluster(surrounding, newPayload)
     }
   }
 
   /**
    * Return a sequence of coordinates in the cardinal directions
+   *
    * @param c origin coordinate
    * @return sequence of neighbors
    */
@@ -118,8 +121,12 @@ object Board extends BoardValidations {
    */
   def fromInputValidated(input: RawInput): Either[NonEmptyList[BoardError], Board] = {
     runChecks(input) map { validatedInput =>
-      val coords = validatedInput.zipWithIndex.map({ case (row, rowIdx) => row.toSeq.zipWithIndex.map({ case (cell, colIdx) => Coord(colIdx, rowIdx, cell == '*') }) })
-      new Board(coords)
+      val coords = validatedInput.zipWithIndex.map {
+        case (row, rowIdx) => row.toSeq.zipWithIndex.map {
+          case (cell, colIdx) => Coord(colIdx, rowIdx, cell == '*')
+        }
+      }
+      Board(coords)
     }
   }
 }
