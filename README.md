@@ -1,6 +1,8 @@
 # Bounding Box App
 Command-line program for finding bounding boxes from input
 
+See requirements doc here: BoundingBox.md
+
 ## Design Choices
 The twin recursive algorithms at the heart of the program share a
 cache of visited coordinates. This is highly over-engineered for the
